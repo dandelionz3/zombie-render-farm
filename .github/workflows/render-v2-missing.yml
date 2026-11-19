@@ -1,0 +1,128 @@
+name: render-v2-missing
+
+# Re-render SATU chunk v2 yang gagal/hilang di full run Zombie 3D v2.
+# Dipicu manual dari tab Actions dengan input chunk + rentang frame + format.
+# Upload ke release v2 yang SAMA dengan full run v2 (default zombie-v2-full-run-20261119).
+# Pola: render-missing.yml Rubik (curl --retry untuk download Blender).
+on:
+  workflow_dispatch:
+    inputs:
+      chunk:
+        description: "Nama chunk, misal 9x16-r atau 16x9-m (dipakai sebagai nama file zip)"
+        required: true
+        type: string
+      start:
+        description: "Frame Blender awal chunk"
+        required: true
+        type: string
+      end:
+        description: "Frame Blender akhir chunk"
+        required: true
+        type: string
+      res_x:
+        description: "Lebar render (540 untuk 9:16, 960 untuk 16:9)"
+        required: true
+        type: string
+        default: "540"
+      res_y:
+        description: "Tinggi render (960 untuk 9:16, 540 untuk 16:9)"
+        required: true
+        type: string
+        default: "960"
+      lensk:
+        description: "Faktor lens (0.62 untuk 9:16, 1.00 untuk 16:9)"
+        required: true
+        type: string
+        default: "0.62"
+      release_tag:
+        description: "Release tujuan upload (sama dengan full run)"
+        required: true
+        type: string
+        default: "zombie-v2-full-run-20261119"
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: write
+    env:
+      FS_SAMPLES: "6"
+      FS_RAY: "0"
+      FS_VOL: "1"
+      FS_VOLTILE: "16"
+      FS_DOF: "1"
+      FS_MB: "1"
+      FS_SUB: "1"
+      FS_BEVEL: "0"
+      CHUNK: ${{ inputs.chunk }}
+      START: ${{ inputs.start }}
+      END: ${{ inputs.end }}
+      RES_X: ${{ inputs.res_x }}
+      RES_Y: ${{ inputs.res_y }}
+      LENSK: ${{ inputs.lensk }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Mesa/EGL + DejaVu font + zip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1-mesa-dri libglx-mesa0 fonts-dejavu-core zip
+          ldconfig -p | grep libEGL
+
+      - name: Download Blender 4.5.3 LTS (with retries)
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            echo "Download attempt $i"
+            if curl -L --retry 5 --retry-delay 10 --retry-all-errors \
+                -o blender.tar.xz \
+                https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz \
+                && tar -tf blender.tar.xz >/dev/null; then
+              echo "Download OK on attempt $i"
+              break
+            fi
+            echo "Download attempt $i failed, retrying in 30s..."
+            rm -f blender.tar.xz
+            sleep 30
+            if [ "$i" = 3 ]; then echo "FAIL: Blender download failed 3x"; exit 1; fi
+          done
+          tar -xf blender.tar.xz
+          ./blender-4.5.3-linux-x64/blender --version
+
+      - name: Render frames
+        run: |
+          EXPECTED=$((END - START + 1))
+          echo "Chunk $CHUNK: frames $START-$END ($EXPECTED frames) ${RES_X}x${RES_Y} lensk $LENSK"
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          S=$(date +%s)
+          # NOTE: keberhasilan dinilai dari FILE FRAME, bukan exit code Blender —
+          # Mesa bisa segfault saat teardown SETELAH semua frame tersimpan.
+          ./blender-4.5.3-linux-x64/blender -b --factory-startup \
+            -P pipeline-v2/animate_zombie_v2.py -- "$GITHUB_WORKSPACE/out" \
+            --start $START --end $END --plan pipeline-v2/plan.json \
+            --res $RES_X $RES_Y --lensk $LENSK || echo "blender exited rc=$?"
+          E=$(date +%s)
+          N=$(ls "$GITHUB_WORKSPACE/out"/f_*.png 2>/dev/null | wc -l)
+          echo "CHUNK=$CHUNK FRAMES=$N/$EXPECTED SECS=$((E-S))" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$N" -lt "$EXPECTED" ]; then echo "FAIL: only $N/$EXPECTED frames rendered"; exit 1; fi
+
+      - name: Zip + upload chunk to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          EXPECTED=$((END - START + 1))
+          cd "$GITHUB_WORKSPACE/out"
+          zip -q "../${CHUNK}.zip" f_*.png
+          cd "$GITHUB_WORKSPACE"
+          ZIPSIZE=$(stat -c%s "${CHUNK}.zip")
+          ZIPSIZE_MB=$((ZIPSIZE / 1024 / 1024))
+          INZIP=$(unzip -l "${CHUNK}.zip" | grep -c 'f_[0-9]*\.png')
+          echo "CHUNK=$CHUNK ZIP=${ZIPSIZE_MB}MB FILES_IN_ZIP=$INZIP/$EXPECTED" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$ZIPSIZE" -ge 2147483648 ]; then echo "FAIL: zip >= 2 GB ($ZIPSIZE bytes)"; exit 1; fi
+          if [ "$INZIP" -lt "$EXPECTED" ]; then echo "FAIL: zip holds $INZIP, expected $EXPECTED"; exit 1; fi
+          gh release upload "$RELEASE_TAG" "${CHUNK}.zip" --clobber
+          gh release view "$RELEASE_TAG" --json assets \
+            --jq ".assets[] | select(.name == \"${CHUNK}.zip\") | .name + \" \" + (.size|tostring)"

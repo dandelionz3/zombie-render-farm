@@ -1,0 +1,403 @@
+name: render-v2-full
+
+# Full run film Zombie Apocalypse v2 "DARAH TERAKHIR" — 2880 frame total
+# (40 job paralel, 72 frame/job). Dipicu manual dari tab Actions.
+# Repo harus PUBLIK supaya menit Actions gratis.
+#   9:16  540x960 lensk 0.62: frame Blender 1-1440 (20 job)
+#   16:9  960x540 lensk 1.00: frame Blender 1-1440 (20 job)
+#   (Frame Blender = plan f + 1; plan f 0-1439.)
+# Setting B7 dengan DEVIASI TERUKUR v2: FS_SAMPLES=6 (bukan 8 — S4 lokal
+# samples 8 rata-rata 47,0 dtk/frame, samples 6 rata-rata 37,3 dtk/frame).
+# Pipeline v2 di pipeline-v2/ (md5 identik dengan v2/pipeline/).
+# Tiap job zip frame-nya lalu upload sebagai release asset ke release yang
+# namanya diisi di input `release_tag` pakai `gh release upload`.
+# Release zombie-v2-full-run-20261119 DIBUAT DULU dari luar (sebelum trigger).
+# JANGAN sentuh workflow/Release v1 (render-full.yml,
+# zombie-full-run-20261119).
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Nama release GitHub yang SUDAH dibuat dulu dari luar (40 job upload zip chunk ke sini)"
+        required: true
+        type: string
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: 9x16-a
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 1
+            end: 72
+          - name: 9x16-b
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 73
+            end: 144
+          - name: 9x16-c
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 145
+            end: 216
+          - name: 9x16-d
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 217
+            end: 288
+          - name: 9x16-e
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 289
+            end: 360
+          - name: 9x16-f
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 361
+            end: 432
+          - name: 9x16-g
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 433
+            end: 504
+          - name: 9x16-h
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 505
+            end: 576
+          - name: 9x16-i
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 577
+            end: 648
+          - name: 9x16-j
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 649
+            end: 720
+          - name: 9x16-k
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 721
+            end: 792
+          - name: 9x16-l
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 793
+            end: 864
+          - name: 9x16-m
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 865
+            end: 936
+          - name: 9x16-n
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 937
+            end: 1008
+          - name: 9x16-o
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 1009
+            end: 1080
+          - name: 9x16-p
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 1081
+            end: 1152
+          - name: 9x16-q
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 1153
+            end: 1224
+          - name: 9x16-r
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 1225
+            end: 1296
+          - name: 9x16-s
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 1297
+            end: 1368
+          - name: 9x16-t
+            plan: pipeline-v2/plan.json
+            res_x: 540
+            res_y: 960
+            lensk: "0.62"
+            start: 1369
+            end: 1440
+          - name: 16x9-a
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 1
+            end: 72
+          - name: 16x9-b
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 73
+            end: 144
+          - name: 16x9-c
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 145
+            end: 216
+          - name: 16x9-d
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 217
+            end: 288
+          - name: 16x9-e
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 289
+            end: 360
+          - name: 16x9-f
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 361
+            end: 432
+          - name: 16x9-g
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 433
+            end: 504
+          - name: 16x9-h
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 505
+            end: 576
+          - name: 16x9-i
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 577
+            end: 648
+          - name: 16x9-j
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 649
+            end: 720
+          - name: 16x9-k
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 721
+            end: 792
+          - name: 16x9-l
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 793
+            end: 864
+          - name: 16x9-m
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 865
+            end: 936
+          - name: 16x9-n
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 937
+            end: 1008
+          - name: 16x9-o
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 1009
+            end: 1080
+          - name: 16x9-p
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 1081
+            end: 1152
+          - name: 16x9-q
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 1153
+            end: 1224
+          - name: 16x9-r
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 1225
+            end: 1296
+          - name: 16x9-s
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 1297
+            end: 1368
+          - name: 16x9-t
+            plan: pipeline-v2/plan.json
+            res_x: 960
+            res_y: 540
+            lensk: "1.00"
+            start: 1369
+            end: 1440
+    env:
+      FS_SAMPLES: "6"
+      FS_RAY: "0"
+      FS_VOL: "1"
+      FS_VOLTILE: "16"
+      FS_DOF: "1"
+      FS_MB: "1"
+      FS_SUB: "1"
+      FS_BEVEL: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Mesa/EGL + DejaVu font + zip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1-mesa-dri libglx-mesa0 fonts-dejavu-core zip
+          ldconfig -p | grep libEGL
+          zip -v | head -2
+
+      - name: Restore cached Blender
+        id: cache-blender
+        uses: actions/cache@v4
+        with:
+          path: blender-4.5.3-linux-x64
+          key: blender-4.5.3-linux-x64
+
+      - name: Download Blender 4.5.3 LTS (cache miss only, with retries)
+        if: steps.cache-blender.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            echo "Download attempt $i"
+            if curl -L --retry 5 --retry-delay 10 --retry-all-errors \
+                -o blender.tar.xz \
+                https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz \
+                && tar -tf blender.tar.xz >/dev/null; then
+              echo "Download OK on attempt $i"
+              break
+            fi
+            echo "Download attempt $i failed, retrying in 30s..."
+            rm -f blender.tar.xz
+            sleep 30
+            if [ "$i" = 3 ]; then echo "FAIL: Blender download failed 3x"; exit 1; fi
+          done
+          tar -xf blender.tar.xz
+          ./blender-4.5.3-linux-x64/blender --version
+
+      - name: Render frames
+        run: |
+          START=${{ matrix.start }}
+          END=${{ matrix.end }}
+          EXPECTED=$((END - START + 1))
+          echo "Chunk ${{ matrix.name }}: frames $START-$END ($EXPECTED frames)"
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          S=$(date +%s)
+          # NOTE: keberhasilan dinilai dari FILE FRAME, bukan exit code Blender —
+          # Mesa bisa segfault saat teardown SETELAH semua frame tersimpan.
+          ./blender-4.5.3-linux-x64/blender -b --factory-startup \
+            -P pipeline-v2/animate_zombie_v2.py -- "$GITHUB_WORKSPACE/out" \
+            --start $START --end $END --plan pipeline-v2/plan.json \
+            --res ${{ matrix.res_x }} ${{ matrix.res_y }} --lensk ${{ matrix.lensk }} || echo "blender exited rc=$?"
+          E=$(date +%s)
+          N=$(ls "$GITHUB_WORKSPACE/out"/f_*.png 2>/dev/null | wc -l)
+          echo "CHUNK=${{ matrix.name }} FRAMES=$N/$EXPECTED SECS=$((E-S))" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$N" -lt "$EXPECTED" ]; then echo "FAIL: only $N/$EXPECTED frames rendered"; exit 1; fi
+
+      - name: Zip + upload chunk to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHUNK: ${{ matrix.name }}
+          START: ${{ matrix.start }}
+          END: ${{ matrix.end }}
+        run: |
+          set -euo pipefail
+          EXPECTED=$((END - START + 1))
+          cd "$GITHUB_WORKSPACE/out"
+          zip -q "../${CHUNK}.zip" f_*.png
+          cd "$GITHUB_WORKSPACE"
+          ZIPSIZE=$(stat -c%s "${CHUNK}.zip")
+          ZIPSIZE_MB=$((ZIPSIZE / 1024 / 1024))
+          INZIP=$(unzip -l "${CHUNK}.zip" | grep -c 'f_[0-9]*\.png')
+          echo "CHUNK=$CHUNK ZIP=${ZIPSIZE_MB}MB FILES_IN_ZIP=$INZIP/$EXPECTED" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$ZIPSIZE" -ge 2147483648 ]; then echo "FAIL: zip >= 2 GB ($ZIPSIZE bytes)"; exit 1; fi
+          if [ "$INZIP" -lt "$EXPECTED" ]; then echo "FAIL: zip holds $INZIP, expected $EXPECTED"; exit 1; fi
+          # Release (input release_tag) dibuat dulu dari luar sebelum trigger,
+          # jadi 40 job paralel tinggal upload (clobber = timpa kalau re-run).
+          gh release upload "${{ inputs.release_tag }}" "${CHUNK}.zip" --clobber
+          gh release view "${{ inputs.release_tag }}" --json assets \
+            --jq ".assets[] | select(.name == \"${CHUNK}.zip\") | .name + \" \" + (.size|tostring)"
