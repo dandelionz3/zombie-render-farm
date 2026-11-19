@@ -1,0 +1,113 @@
+name: render-test
+
+# Uji 120 frame film Zombie Apocalypse (Eevee, setting B7):
+#   - rentang tersibuk S4, frame Blender 501-560 (plan f500-559)
+#   - 9:16  540x960 lensk 0.62: 10 job x 6 frame
+#   - 16:9  960x540 lensk 1.00: 10 job x 6 frame
+#   - actions/cache untuk Blender 4.5.3 (pola render-test-v2.yml rubik-render-farm)
+#   - download Blender pakai retry loop
+# Dipicu manual dari tab Actions. Repo harus PUBLIK supaya menit gratis.
+# Verifikasi setelah selesai: semua 120 frame ada tanpa gap + piksel-identik
+# vs render lokal Eevee pada frame yang sama (mean abs diff < 1).
+# Workflow ini TIDAK memicu render-full.yml.
+on:
+  workflow_dispatch:
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { fmt: "9x16", seg: 1,  res_x: 540, res_y: 960, lensk: "0.62", start: 501, end: 506 }
+          - { fmt: "9x16", seg: 2,  res_x: 540, res_y: 960, lensk: "0.62", start: 507, end: 512 }
+          - { fmt: "9x16", seg: 3,  res_x: 540, res_y: 960, lensk: "0.62", start: 513, end: 518 }
+          - { fmt: "9x16", seg: 4,  res_x: 540, res_y: 960, lensk: "0.62", start: 519, end: 524 }
+          - { fmt: "9x16", seg: 5,  res_x: 540, res_y: 960, lensk: "0.62", start: 525, end: 530 }
+          - { fmt: "9x16", seg: 6,  res_x: 540, res_y: 960, lensk: "0.62", start: 531, end: 536 }
+          - { fmt: "9x16", seg: 7,  res_x: 540, res_y: 960, lensk: "0.62", start: 537, end: 542 }
+          - { fmt: "9x16", seg: 8,  res_x: 540, res_y: 960, lensk: "0.62", start: 543, end: 548 }
+          - { fmt: "9x16", seg: 9,  res_x: 540, res_y: 960, lensk: "0.62", start: 549, end: 554 }
+          - { fmt: "9x16", seg: 10, res_x: 540, res_y: 960, lensk: "0.62", start: 555, end: 560 }
+          - { fmt: "16x9", seg: 1,  res_x: 960, res_y: 540, lensk: "1.00", start: 501, end: 506 }
+          - { fmt: "16x9", seg: 2,  res_x: 960, res_y: 540, lensk: "1.00", start: 507, end: 512 }
+          - { fmt: "16x9", seg: 3,  res_x: 960, res_y: 540, lensk: "1.00", start: 513, end: 518 }
+          - { fmt: "16x9", seg: 4,  res_x: 960, res_y: 540, lensk: "1.00", start: 519, end: 524 }
+          - { fmt: "16x9", seg: 5,  res_x: 960, res_y: 540, lensk: "1.00", start: 525, end: 530 }
+          - { fmt: "16x9", seg: 6,  res_x: 960, res_y: 540, lensk: "1.00", start: 531, end: 536 }
+          - { fmt: "16x9", seg: 7,  res_x: 960, res_y: 540, lensk: "1.00", start: 537, end: 542 }
+          - { fmt: "16x9", seg: 8,  res_x: 960, res_y: 540, lensk: "1.00", start: 543, end: 548 }
+          - { fmt: "16x9", seg: 9,  res_x: 960, res_y: 540, lensk: "1.00", start: 549, end: 554 }
+          - { fmt: "16x9", seg: 10, res_x: 960, res_y: 540, lensk: "1.00", start: 555, end: 560 }
+    env:
+      FS_SAMPLES: "8"
+      FS_RAY: "0"
+      FS_VOL: "1"
+      FS_VOLTILE: "16"
+      FS_DOF: "1"
+      FS_MB: "1"
+      FS_SUB: "1"
+      FS_BEVEL: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Mesa/EGL + DejaVu font
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1-mesa-dri libglx-mesa0 fonts-dejavu-core
+          ldconfig -p | grep libEGL
+
+      - name: Restore cached Blender
+        id: cache-blender
+        uses: actions/cache@v4
+        with:
+          path: blender-4.5.3-linux-x64
+          key: blender-4.5.3-linux-x64
+
+      - name: Download Blender 4.5.3 LTS (cache miss only, with retries)
+        if: steps.cache-blender.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            echo "Download attempt $i"
+            if curl -L --retry 5 --retry-delay 10 --retry-all-errors \
+                -o blender.tar.xz \
+                https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz \
+                && tar -tf blender.tar.xz >/dev/null; then
+              echo "Download OK on attempt $i"
+              break
+            fi
+            echo "Download attempt $i failed, retrying in 30s..."
+            rm -f blender.tar.xz
+            sleep 30
+            if [ "$i" = 3 ]; then echo "FAIL: Blender download failed 3x"; exit 1; fi
+          done
+          tar -xf blender.tar.xz
+          ./blender-4.5.3-linux-x64/blender --version
+
+      - name: Render 6 frames
+        run: |
+          START=${{ matrix.start }}
+          END=${{ matrix.end }}
+          echo "Chunk ${{ matrix.fmt }}-seg${{ matrix.seg }}: frames $START-$END (cache-hit=${{ steps.cache-blender.outputs.cache-hit }})"
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          S=$(date +%s)
+          # NOTE: keberhasilan dinilai dari FILE FRAME, bukan exit code Blender —
+          # Mesa bisa segfault saat teardown SETELAH semua frame tersimpan.
+          ./blender-4.5.3-linux-x64/blender -b --factory-startup \
+            -P pipeline/animate_zombie.py -- "$GITHUB_WORKSPACE/out" \
+            --start $START --end $END --plan pipeline/plan.json \
+            --res ${{ matrix.res_x }} ${{ matrix.res_y }} --lensk ${{ matrix.lensk }} || echo "blender exited rc=$?"
+          E=$(date +%s)
+          N=$(ls "$GITHUB_WORKSPACE/out"/f_*.png 2>/dev/null | wc -l)
+          echo "CHUNK=${{ matrix.fmt }}-seg${{ matrix.seg }} CACHE_HIT=${{ steps.cache-blender.outputs.cache-hit }} FRAMES=$N/6 SECS=$((E-S))" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$N" -lt 6 ]; then echo "FAIL: only $N/6 frames rendered"; exit 1; fi
+
+      - name: Upload frames
+        uses: actions/upload-artifact@v4
+        with:
+          name: frames-${{ matrix.fmt }}-seg${{ matrix.seg }}
+          path: out/f_*.png
+          if-no-files-found: error
