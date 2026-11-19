@@ -1,0 +1,118 @@
+name: render-v2-test
+
+# Uji 120 frame film Zombie Apocalypse v2 "DARAH TERAKHIR" (Eevee, setting B7
+# dengan DEVIASI TERUKUR: samples 6, bukan 8 — S4 lokal samples 8 rata-rata
+# 47,0 dtk/frame, samples 6 rata-rata 37,3 dtk/frame):
+#   - S1 hook, plan f0-59  (frame Blender 1-60):   10 job x 6 frame
+#   - S7 Boss, plan f1104-1163 (frame Blender 1105-1164): 10 job x 6 frame
+#   - 9:16 540x960 lensk 0.62 saja (16:9 menyusul di full run)
+#   - actions/cache untuk Blender 4.5.3 (pola render-test.yml v1)
+#   - download Blender pakai retry loop
+# Dipicu manual dari tab Actions. Repo harus PUBLIK supaya menit gratis.
+# Verifikasi setelah selesai: semua 120 frame ada tanpa gap + piksel-identik
+# vs render lokal Eevee pada frame yang sama (mean abs diff < 1):
+#   s1hook/f_0031.png (Blender 32) dan s7boss/f_1162.png (Blender 1163).
+# Workflow ini TIDAK memicu render-v2-full.yml dan TIDAK menyentuh
+# workflow/Release v1 (render-test.yml, render-full.yml,
+# zombie-full-run-20261119).
+on:
+  workflow_dispatch:
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { fmt: "9x16", seg: "s1-01", res_x: 540, res_y: 960, lensk: "0.62", start: 1,    end: 6 }
+          - { fmt: "9x16", seg: "s1-02", res_x: 540, res_y: 960, lensk: "0.62", start: 7,    end: 12 }
+          - { fmt: "9x16", seg: "s1-03", res_x: 540, res_y: 960, lensk: "0.62", start: 13,   end: 18 }
+          - { fmt: "9x16", seg: "s1-04", res_x: 540, res_y: 960, lensk: "0.62", start: 19,   end: 24 }
+          - { fmt: "9x16", seg: "s1-05", res_x: 540, res_y: 960, lensk: "0.62", start: 25,   end: 30 }
+          - { fmt: "9x16", seg: "s1-06", res_x: 540, res_y: 960, lensk: "0.62", start: 31,   end: 36 }
+          - { fmt: "9x16", seg: "s1-07", res_x: 540, res_y: 960, lensk: "0.62", start: 37,   end: 42 }
+          - { fmt: "9x16", seg: "s1-08", res_x: 540, res_y: 960, lensk: "0.62", start: 43,   end: 48 }
+          - { fmt: "9x16", seg: "s1-09", res_x: 540, res_y: 960, lensk: "0.62", start: 49,   end: 54 }
+          - { fmt: "9x16", seg: "s1-10", res_x: 540, res_y: 960, lensk: "0.62", start: 55,   end: 60 }
+          - { fmt: "9x16", seg: "s7-01", res_x: 540, res_y: 960, lensk: "0.62", start: 1105, end: 1110 }
+          - { fmt: "9x16", seg: "s7-02", res_x: 540, res_y: 960, lensk: "0.62", start: 1111, end: 1116 }
+          - { fmt: "9x16", seg: "s7-03", res_x: 540, res_y: 960, lensk: "0.62", start: 1117, end: 1122 }
+          - { fmt: "9x16", seg: "s7-04", res_x: 540, res_y: 960, lensk: "0.62", start: 1123, end: 1128 }
+          - { fmt: "9x16", seg: "s7-05", res_x: 540, res_y: 960, lensk: "0.62", start: 1129, end: 1134 }
+          - { fmt: "9x16", seg: "s7-06", res_x: 540, res_y: 960, lensk: "0.62", start: 1135, end: 1140 }
+          - { fmt: "9x16", seg: "s7-07", res_x: 540, res_y: 960, lensk: "0.62", start: 1141, end: 1146 }
+          - { fmt: "9x16", seg: "s7-08", res_x: 540, res_y: 960, lensk: "0.62", start: 1147, end: 1152 }
+          - { fmt: "9x16", seg: "s7-09", res_x: 540, res_y: 960, lensk: "0.62", start: 1153, end: 1158 }
+          - { fmt: "9x16", seg: "s7-10", res_x: 540, res_y: 960, lensk: "0.62", start: 1159, end: 1164 }
+    env:
+      FS_SAMPLES: "6"
+      FS_RAY: "0"
+      FS_VOL: "1"
+      FS_VOLTILE: "16"
+      FS_DOF: "1"
+      FS_MB: "1"
+      FS_SUB: "1"
+      FS_BEVEL: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Mesa/EGL + DejaVu font
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1-mesa-dri libglx-mesa0 fonts-dejavu-core
+          ldconfig -p | grep libEGL
+
+      - name: Restore cached Blender
+        id: cache-blender
+        uses: actions/cache@v4
+        with:
+          path: blender-4.5.3-linux-x64
+          key: blender-4.5.3-linux-x64
+
+      - name: Download Blender 4.5.3 LTS (cache miss only, with retries)
+        if: steps.cache-blender.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            echo "Download attempt $i"
+            if curl -L --retry 5 --retry-delay 10 --retry-all-errors \
+                -o blender.tar.xz \
+                https://download.blender.org/release/Blender4.5/blender-4.5.3-linux-x64.tar.xz \
+                && tar -tf blender.tar.xz >/dev/null; then
+              echo "Download OK on attempt $i"
+              break
+            fi
+            echo "Download attempt $i failed, retrying in 30s..."
+            rm -f blender.tar.xz
+            sleep 30
+            if [ "$i" = 3 ]; then echo "FAIL: Blender download failed 3x"; exit 1; fi
+          done
+          tar -xf blender.tar.xz
+          ./blender-4.5.3-linux-x64/blender --version
+
+      - name: Render 6 frames
+        run: |
+          START=${{ matrix.start }}
+          END=${{ matrix.end }}
+          echo "Chunk ${{ matrix.fmt }}-${{ matrix.seg }}: frames $START-$END (cache-hit=${{ steps.cache-blender.outputs.cache-hit }})"
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          S=$(date +%s)
+          # NOTE: keberhasilan dinilai dari FILE FRAME, bukan exit code Blender —
+          # Mesa bisa segfault saat teardown SETELAH semua frame tersimpan.
+          ./blender-4.5.3-linux-x64/blender -b --factory-startup \
+            -P pipeline-v2/animate_zombie_v2.py -- "$GITHUB_WORKSPACE/out" \
+            --start $START --end $END --plan pipeline-v2/plan.json \
+            --res ${{ matrix.res_x }} ${{ matrix.res_y }} --lensk ${{ matrix.lensk }} || echo "blender exited rc=$?"
+          E=$(date +%s)
+          N=$(ls "$GITHUB_WORKSPACE/out"/f_*.png 2>/dev/null | wc -l)
+          echo "CHUNK=${{ matrix.fmt }}-${{ matrix.seg }} CACHE_HIT=${{ steps.cache-blender.outputs.cache-hit }} FRAMES=$N/6 SECS=$((E-S))" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$N" -lt 6 ]; then echo "FAIL: only $N/6 frames rendered"; exit 1; fi
+
+      - name: Upload frames
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-frames-${{ matrix.fmt }}-${{ matrix.seg }}
+          path: out/f_*.png
+          if-no-files-found: error
